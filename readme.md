@@ -1,38 +1,107 @@
 # dev-bootstrap
 
-A Windows Forms application for managing developer environment setup for FreeFlow Hub.
-Select which repos to install or uninstall through a visual interface.
+A client/server application for managing developer environment setup for FreeFlow Hub.
+A WinForms client provides a visual interface for selecting repos to install or uninstall,
+while an ASP.NET Core server manages configuration and repo data backed by a database.
+
+## Architecture
+
+```
+┌─────────────┐      HTTP       ┌──────────────────┐
+│   Client     │ ◄────────────► │     Server        │
+│  (WinForms)  │                │ (Minimal API)     │
+│              │                │       │           │
+│  IApiClient  │                │  Endpoints        │
+│  ApiClient   │                │       │           │
+└─────────────┘                │  Core Interfaces  │
+                                │       │           │
+                                │  DAL (concrete)   │
+                                │       │           │
+                                │   Database        │
+                                └──────────────────┘
+```
+
+- **DevBootstrap.Core** -- shared models and repository interfaces (no DB dependency)
+- **DevBootstrap.Server** -- ASP.NET Core Minimal API; resolves interfaces via DI
+- **DevBootstrap.Dal** -- implements repository interfaces; concrete DB provider added later
+- **DevBootstrap.Client** -- WinForms GUI; communicates with server via HTTP
+
+All data access is behind interfaces (IRepoRepository, IToolRepository, IConfigRepository)
+so the database provider can be swapped without changing server or client code.
 
 ## What it does
 
 - Provides a GUI with checkboxes to select which repos to install or uninstall
 - Checks Git is installed (installs via winget if missing)
-- Configures Git identity (name and email)
+- Configures Git identity (name and email from global git config)
 - Checks GitHub CLI is installed (installs via winget if missing)
 - Checks GitHub CLI is authenticated (runs `gh auth login` if not, opening a browser for login)
 - Checks Visual Studio 2022 Community is installed (installs via winget if missing)
 - Checks Claude Code is installed (installs via winget if missing)
 - Adds Claude Code to PATH if missing
+- Checks MarkText is installed (installs via winget if missing)
 - Creates C:\Projects base directory
 - Clones selected repos from GitHub (or pulls latest if already cloned)
 - Removes unselected repos from disk when uninstall is confirmed
 
 ## Features
 
-- **Repo selector** -- checklist of all available FreeFlow Hub repos with Select All / Deselect All
+- **Repo selector** -- checklist of all available repos with Select All / Deselect All
 - **Install** -- clones checked repos (or pulls latest if already present)
-- **Uninstall** -- removes unchecked repos from disk after confirmation
+- **Uninstall** -- removes unchecked repos from disk after confirmation (lists each repo by name)
 - **Status panel** -- real-time progress log showing each operation
 - **Auto-detect** -- repos already cloned under C:\Projects are pre-checked on launch
+- **Database-backed config** -- repo catalogue and tool definitions stored in a database, served via API
 
 ## Requirements
 
 - Windows 10/11
-- .NET Framework 4.7.2 or later (included with Windows 10 1803+)
+- .NET 8 SDK
 - winget (comes with Windows 11, available via Microsoft Store on Windows 10)
 - Internet connection
-- GitHub access to the FreeFlow Hub organisation
+- GitHub access to the garyffh account
 - Anthropic account (Pro, Max, Team or Enterprise) for Claude Code
+
+## Project structure
+
+```
+Dev.Bootstrap/
+  Dev.Bootstrap.sln
+
+  src/
+    DevBootstrap.Client/             -- WinForms app (.NET 8 Windows)
+      Program.cs                     -- Entry point (requests admin elevation)
+      MainForm.cs                    -- Main window with repo checklist
+      MainForm.Designer.cs           -- Form layout (auto-generated)
+      Services/
+        IApiClient.cs                -- Interface for server communication
+        ApiClient.cs                 -- HttpClient-based implementation
+
+    DevBootstrap.Server/             -- ASP.NET Core Minimal API (.NET 8)
+      Program.cs                     -- Host builder, DI registration
+      Api/
+        RepoEndpoints.cs             -- /api/repos endpoints
+        ToolEndpoints.cs             -- /api/tools endpoints
+        ConfigEndpoints.cs           -- /api/config endpoints
+
+    DevBootstrap.Core/               -- Shared models and interfaces (.NET 8 class library)
+      Models/
+        Repo.cs                      -- Repo with name, description, dependencies
+        Tool.cs                      -- Tool with name, winget ID, type
+        AppConfig.cs                 -- App configuration model
+      Interfaces/
+        IRepoRepository.cs           -- Data access interface for repos
+        IToolRepository.cs           -- Data access interface for tools
+        IConfigRepository.cs         -- Data access interface for config
+
+    DevBootstrap.Dal/                -- Data access layer (.NET 8 class library)
+      DependencyInjection.cs         -- Service registration extension method
+      (concrete implementations added when DB provider is chosen)
+
+  tests/
+    DevBootstrap.Server.Tests/
+    DevBootstrap.Core.Tests/
+```
 
 ## Usage
 
@@ -40,50 +109,49 @@ Select which repos to install or uninstall through a visual interface.
 
 ```powershell
 # Clone this repo
-git clone https://github.com/YOUR-ORG/dev-bootstrap.git C:\Projects\dev-bootstrap
+git clone https://github.com/garyffh/dev_bootstrap.git C:\Projects\dev_bootstrap
 
-# Open the solution in Visual Studio and run, or build from CLI
-cd C:\Projects\dev-bootstrap
+# Build
+cd C:\Projects\dev_bootstrap\Dev.Bootstrap
 dotnet build
-dotnet run
+
+# Start the server
+dotnet run --project src/DevBootstrap.Server
+
+# Start the client (separate terminal, as Administrator)
+dotnet run --project src/DevBootstrap.Client
 ```
 
 ### Option 2 -- Run published executable
 
 ```powershell
-# Download the latest release and run
-.\DevBootstrap.exe
+# Start the server
+.\DevBootstrap.Server.exe
+
+# Start the client (as Administrator)
+.\DevBootstrap.Client.exe
 ```
 
 ### Using the app
 
-1. Launch **DevBootstrap.exe**
-2. The app checks for required tools (Git, GitHub CLI) and installs any that are missing
-3. If GitHub CLI is not authenticated, the app runs `gh auth login` and opens a browser -- log in with your GitHub account that has access to the FreeFlow Hub org
-4. The repo list loads with already-cloned repos pre-checked
-5. Check the repos you want installed, uncheck the ones you want removed
-6. Click **Install** to clone/pull the checked repos
-7. Click **Uninstall** to remove unchecked repos (a confirmation dialog will appear)
-8. Monitor progress in the status panel at the bottom
+1. Start the **server** first
+2. Launch **DevBootstrap.Client.exe** as Administrator (the app requests elevation on startup)
+3. The app checks for required tools (Git, GitHub CLI, VS 2022, Claude Code, MarkText) and installs any that are missing
+4. If a tool install fails, the error is logged and setup continues with the remaining tools
+5. If GitHub CLI is not authenticated, the app runs `gh auth login` and opens a browser -- log in with your GitHub account
+6. The repo list is loaded from the server (originally seeded from GitHub)
+7. Check the repos you want installed, uncheck the ones you want removed
+8. Click **Install** to clone/pull the checked repos
+9. Click **Uninstall** to remove unchecked repos (a confirmation dialog lists each repo being removed)
+10. Monitor progress in the status panel at the bottom
+11. After setup, run `claude login` in a terminal to authenticate Claude Code
 
-## Project structure
+## Repo catalogue
 
-```
-dev-bootstrap/
-  DevBootstrap.sln            -- Visual Studio solution
-  DevBootstrap/
-    Program.cs                 -- Entry point
-    MainForm.cs                -- Main window with repo checklist
-    MainForm.Designer.cs       -- Form layout (auto-generated)
-    GitManager.cs              -- Git clone, pull, and remove logic
-    ToolInstaller.cs           -- winget install/update for Git, GitHub CLI, VS 2022, Claude Code, MarkText
-    Config.cs                  -- Centralised configuration (org, repos, paths)
-    repos.json                 -- Repo catalogue with per-project dependency lists
-```
+Repo data is stored in the database and served via the API. The database can be
+seeded from the `repos.json` file in the `garyffh/dev_bootstrap` GitHub repo.
 
-## Repo catalogue (repos.json)
-
-Each repo entry in `repos.json` includes a dependency list so the app knows
+Each repo entry includes a dependency list so the app knows
 exactly which tools to install when a project is selected. When you check a
 repo in the UI, its dependencies are automatically resolved and installed
 before cloning.
@@ -109,7 +177,7 @@ before cloning.
     {
       "name": "data-pipeline",
       "description": "Python ETL and analytics",
-      "dependencies": ["python3", "vs2022"]
+      "dependencies": ["vs2022", "python3"]
     },
     {
       "name": "infra",
@@ -138,13 +206,36 @@ New dependency keys can be added to `ToolInstaller.cs` as needed.
 ### How it works
 
 1. User checks repos in the UI
-2. App reads `repos.json` and unions all dependencies from the selected repos
-3. Already-installed tools are skipped (detected via `winget list` or `where`)
-4. Missing tools are installed via winget
-5. Repos are then cloned or pulled
+2. Client fetches the repo catalogue from the server API
+3. App unions all dependencies from the selected repos
+4. Already-installed tools are skipped (detected via `winget list` or `where`)
+5. Missing tools are installed via winget; failures are logged and skipped
+6. Repos are then cloned or pulled
 
 When uninstalling, only repos are removed -- shared tools are left in place
 since other projects may still need them.
+
+## Base tools (always installed)
+
+These tools are installed regardless of repo selection:
+
+| Tool | winget ID |
+|---|---|
+| Git | `Git.Git` |
+| GitHub CLI | `GitHub.cli` |
+| Visual Studio 2022 Community | `Microsoft.VisualStudio.2022.Community` |
+| Claude Code | `Anthropic.ClaudeCode` |
+| MarkText | `MarkText.MarkText` |
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/repos` | List all repos with dependencies |
+| GET | `/api/repos/{name}` | Get a single repo |
+| GET | `/api/tools` | List all tool definitions |
+| GET | `/api/tools/{key}` | Get a single tool definition |
+| GET | `/api/config` | Get app configuration |
 
 ## After setup
 
@@ -158,20 +249,19 @@ claude
 
 ## Adding new repos
 
-Add an entry to `repos.json` with the repo name, description, and its
-dependencies. No rebuild needed -- the app reads the file on launch.
+Add a repo entry via the server API or directly in the database. No rebuild needed.
 
 ## Config
 
-All configuration is centralised in `Config.cs`:
+Configuration is centralised in `Config.cs` (client) and the database (server):
 
 | Property | Description |
 |---|---|
-| `GitEmail` | Git global email address |
-| `GitName` | Git global display name |
+| `GitEmail` | Read from `git config --global user.email` |
+| `GitName` | Read from `git config --global user.name` |
 | `BaseDir` | Local root folder for all projects (default C:\Projects) |
-| `GitHubOrg` | GitHub organisation or username |
-| `Repos` | Loaded from `repos.json` -- repo names, descriptions, and dependencies |
+| `GitHubUser` | GitHub username (`garyffh`) |
+| `ServerUrl` | Base URL for the DevBootstrap server API |
 
 ## First Time Login
 
@@ -184,7 +274,7 @@ gh auth login
 ```
 
 Follow the prompts to authenticate via browser. This grants `git clone` access
-to private FreeFlow Hub repos without needing a separate PAT.
+to private repos without needing a separate PAT.
 
 ### Claude Code
 
@@ -250,7 +340,7 @@ To update Visual Studio 2022:
 winget upgrade Microsoft.VisualStudio.2022.Community
 ```
 
-To refresh repos via the GUI, just re-launch **DevBootstrap.exe** and click **Install**.
+To refresh repos via the GUI, just re-launch the client and click **Install**.
 
 ## Troubleshooting
 
@@ -262,13 +352,15 @@ To refresh repos via the GUI, just re-launch **DevBootstrap.exe** and click **In
 | `gh` not recognised | Restart PowerShell so the updated PATH picks up the GitHub CLI |
 | winget not found | Install App Installer from the Microsoft Store |
 | VS 2022 install hangs | Run `winget install Microsoft.VisualStudio.2022.Community` manually from an elevated PowerShell |
-| App won't launch | Ensure .NET Framework 4.7.2+ is installed |
+| App won't launch | Ensure .NET 8 SDK is installed |
 | Uninstall does nothing | Only unchecked repos are removed -- uncheck the ones you want to delete |
+| Tool install fails | The app logs the error and continues -- check the status panel for details |
+| Server not reachable | Ensure the server is running before starting the client |
 
 ## Visual Studio 2022 Community
 
 dev-bootstrap installs Visual Studio 2022 Community Edition, which is required
-by many of the FreeFlow Hub projects. The installer includes the following
+by many of the projects. The installer includes the following
 workloads by default:
 
 - **.NET desktop development** -- Windows Forms, WPF, console apps
@@ -296,7 +388,7 @@ dev-bootstrap installs MarkText as the default markdown editor for viewing and
 editing README files and project documentation.
 
 MarkText is a free, open source WYSIWYG markdown editor with live preview.
-It is installed automatically as part of the setup.
+It is installed automatically as part of the base tool setup.
 
 To install manually:
 
