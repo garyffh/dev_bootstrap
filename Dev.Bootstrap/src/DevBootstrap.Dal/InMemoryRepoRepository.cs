@@ -10,7 +10,7 @@ public class InMemoryRepoRepository : IRepoRepository
 
     public Task<IReadOnlyList<Repo>> GetAllAsync()
     {
-        IReadOnlyList<Repo> result = _repos.Values.ToList();
+        IReadOnlyList<Repo> result = _repos.Values.OrderBy(r => r.Name).ToList();
         return Task.FromResult(result);
     }
 
