@@ -1,5 +1,6 @@
 using DevBootstrap.Client.Services;
 using DevBootstrap.Core.Models;
+using Serilog;
 
 namespace DevBootstrap.Client;
 
@@ -40,6 +41,7 @@ public partial class MainForm : Form
 
     private void LogStatus(string message)
     {
+        Log.Information(message);
         txtStatus.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
     }
 }

@@ -1,3 +1,4 @@
+using DevBootstrap.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DevBootstrap.Dal;
@@ -6,8 +7,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddDataAccess(this IServiceCollection services)
     {
-        // Register concrete repository implementations here
-        // when the DB provider is chosen.
+        services.AddSingleton<IRepoRepository, InMemoryRepoRepository>();
+        services.AddSingleton<IToolRepository, InMemoryToolRepository>();
+        services.AddSingleton<IConfigRepository, InMemoryConfigRepository>();
         return services;
     }
 }

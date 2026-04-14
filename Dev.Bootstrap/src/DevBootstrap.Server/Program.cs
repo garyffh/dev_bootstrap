@@ -1,14 +1,39 @@
 using DevBootstrap.Dal;
 using DevBootstrap.Server.Api;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File("logs/server-.log", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
 
-builder.Services.AddDataAccess();
+try
+{
+    Log.Information("Starting DevBootstrap Server");
 
-var app = builder.Build();
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseSerilog();
 
-app.MapRepoEndpoints();
-app.MapToolEndpoints();
-app.MapConfigEndpoints();
+    builder.Services.AddDataAccess();
 
-app.Run();
+    var app = builder.Build();
+
+    app.UseSerilogRequestLogging();
+
+    app.MapRepoEndpoints();
+    app.MapToolEndpoints();
+    app.MapConfigEndpoints();
+
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Server terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+public partial class Program { }

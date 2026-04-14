@@ -1,4 +1,5 @@
 using DevBootstrap.Client.Services;
+using Serilog;
 
 namespace DevBootstrap.Client;
 
@@ -7,11 +8,29 @@ static class Program
     [STAThread]
     static void Main()
     {
-        ApplicationConfiguration.Initialize();
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File("logs/client-.log", rollingInterval: RollingInterval.Day)
+            .CreateLogger();
 
-        var http = new HttpClient { BaseAddress = new Uri("http://localhost:5000") };
-        var apiClient = new ApiClient(http);
+        try
+        {
+            Log.Information("Starting DevBootstrap Client");
 
-        Application.Run(new MainForm(apiClient));
+            ApplicationConfiguration.Initialize();
+
+            var http = new HttpClient { BaseAddress = new Uri("http://localhost:5223") };
+            var apiClient = new ApiClient(http);
+
+            Application.Run(new MainForm(apiClient));
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Client terminated unexpectedly");
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
     }
 }
