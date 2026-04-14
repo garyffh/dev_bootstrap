@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Dev.Bootstrap is a client/server application that automates developer environment setup. A WinForms client provides a GUI for selecting repos to clone/remove, while an ASP.NET Core server manages configuration, repo catalogues, and tool dependency data backed by a database. Repos are hosted under the `garyffh` GitHub account.
+Dev.Bootstrap is a desktop application that automates developer environment setup. A WinForms client provides a GUI for selecting repos to clone/remove, calling the DAL directly (no HTTP server required). An ASP.NET Core server project exists for potential future API access. Repos are hosted under the `garyffh` GitHub account.
 
 ## Tech Stack
 
@@ -18,26 +18,30 @@ Dev.Bootstrap is a client/server application that automates developer environmen
 ## Architecture
 
 ```
-┌─────────────────┐       HTTP        ┌─────────────────────┐
-│  Client          │  ◄──────────────► │  Server              │
-│  (WinForms)      │                   │  (ASP.NET Minimal API)│
-│                  │                   │                       │
-│  IApiClient ─────┤                   ├── Api/Endpoints       │
-│  ApiClient       │                   │        │              │
-└─────────────────┘                   │   IRepoRepository     │
-                                       │   IToolRepository     │
-                                       │   IConfigRepository   │
-                                       │        │              │
-                                       │   DAL (concrete impl) │
-                                       │        │              │
-                                       │   Database             │
-                                       └─────────────────────┘
+┌─────────────────────────────────────────┐
+│  Client (WinForms)                       │
+│                                          │
+│  IApiClient ──► ApiClient                │
+│                    │                     │
+│              IRepoRepository             │
+│              IToolRepository             │
+│              IConfigRepository           │
+│                    │                     │
+│              DAL (concrete impl)         │
+│                    │                     │
+│              Database                    │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  Server (ASP.NET Minimal API) [optional] │
+│  Api/Endpoints ──► same DAL + Core       │
+└─────────────────────────────────────────┘
 ```
 
 - **Core** -- shared models and repository interfaces. No dependency on any DB or ORM.
-- **Server** -- Minimal API endpoints. Uses DI to resolve repository interfaces. Can add a controller layer later.
 - **DAL** -- implements repository interfaces from Core. Concrete DB provider chosen at implementation time.
-- **Client** -- WinForms app. Talks to Server via HTTP through IApiClient interface.
+- **Client** -- WinForms app. References DAL directly via DLL; no HTTP server required.
+- **Server** -- Minimal API endpoints (optional). Uses the same DI and DAL for potential future API access.
 
 ## Solution Structure
 
@@ -51,8 +55,8 @@ Dev.Bootstrap/
       MainForm.cs                    -- Main window with repo checklist
       MainForm.Designer.cs           -- Form layout (auto-generated)
       Services/
-        IApiClient.cs                -- Interface for server communication
-        ApiClient.cs                 -- HttpClient-based implementation
+        IApiClient.cs                -- Interface for data access
+        ApiClient.cs                 -- Implementation using DAL repositories directly
 
     DevBootstrap.Server/             -- ASP.NET Core Minimal API (.NET 8)
       Program.cs                     -- Host builder, DI registration, middleware

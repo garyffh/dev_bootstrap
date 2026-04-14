@@ -1,4 +1,7 @@
 using DevBootstrap.Client.Services;
+using DevBootstrap.Core.Interfaces;
+using DevBootstrap.Dal;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace DevBootstrap.Client;
@@ -19,8 +22,14 @@ static class Program
 
             ApplicationConfiguration.Initialize();
 
-            var http = new HttpClient { BaseAddress = new Uri("http://localhost:5223") };
-            var apiClient = new ApiClient(http);
+            var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+            services.AddDataAccess();
+            var provider = services.BuildServiceProvider();
+
+            var apiClient = new ApiClient(
+                provider.GetRequiredService<IRepoRepository>(),
+                provider.GetRequiredService<IToolRepository>(),
+                provider.GetRequiredService<IConfigRepository>());
 
             Application.Run(new MainForm(apiClient));
         }

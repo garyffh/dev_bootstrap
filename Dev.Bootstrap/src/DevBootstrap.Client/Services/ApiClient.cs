@@ -1,32 +1,36 @@
-using System.Net.Http.Json;
+using DevBootstrap.Core.Interfaces;
 using DevBootstrap.Core.Models;
 
 namespace DevBootstrap.Client.Services;
 
 public class ApiClient : IApiClient
 {
-    private readonly HttpClient _http;
+    private readonly IRepoRepository _repoRepository;
+    private readonly IToolRepository _toolRepository;
+    private readonly IConfigRepository _configRepository;
 
-    public ApiClient(HttpClient http)
+    public ApiClient(
+        IRepoRepository repoRepository,
+        IToolRepository toolRepository,
+        IConfigRepository configRepository)
     {
-        _http = http;
+        _repoRepository = repoRepository;
+        _toolRepository = toolRepository;
+        _configRepository = configRepository;
     }
 
     public async Task<IReadOnlyList<Repo>> GetReposAsync()
     {
-        var repos = await _http.GetFromJsonAsync<List<Repo>>("/api/repos");
-        return repos ?? [];
+        return await _repoRepository.GetAllAsync();
     }
 
     public async Task<IReadOnlyList<Tool>> GetToolsAsync()
     {
-        var tools = await _http.GetFromJsonAsync<List<Tool>>("/api/tools");
-        return tools ?? [];
+        return await _toolRepository.GetAllAsync();
     }
 
     public async Task<AppConfig> GetConfigAsync()
     {
-        var config = await _http.GetFromJsonAsync<AppConfig>("/api/config");
-        return config ?? new AppConfig();
+        return await _configRepository.GetAsync();
     }
 }
