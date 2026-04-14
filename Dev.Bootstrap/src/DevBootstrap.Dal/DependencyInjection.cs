@@ -10,6 +10,7 @@ public static class DependencyInjection
         services.AddSingleton<IRepoRepository, InMemoryRepoRepository>();
         services.AddSingleton<IToolRepository, InMemoryToolRepository>();
         services.AddSingleton<IConfigRepository, InMemoryConfigRepository>();
+        services.AddTransient<IGitHubRepoSync, GitHubRepoSync>();
         return services;
     }
 }

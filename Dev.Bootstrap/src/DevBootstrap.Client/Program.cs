@@ -26,6 +26,10 @@ static class Program
             services.AddDataAccess();
             var provider = services.BuildServiceProvider();
 
+            var sync = provider.GetRequiredService<IGitHubRepoSync>();
+            sync.SyncAsync("garyffh").GetAwaiter().GetResult();
+            Log.Information("GitHub repo sync complete");
+
             var apiClient = new ApiClient(
                 provider.GetRequiredService<IRepoRepository>(),
                 provider.GetRequiredService<IToolRepository>(),
