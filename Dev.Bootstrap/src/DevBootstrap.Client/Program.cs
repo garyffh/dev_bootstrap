@@ -35,7 +35,9 @@ static class Program
                 provider.GetRequiredService<IToolRepository>(),
                 provider.GetRequiredService<IConfigRepository>());
 
-            Application.Run(new MainForm(apiClient));
+            var cloneService = new RepoCloneService("garyffh", @"C:\Projects");
+
+            Application.Run(new MainForm(apiClient, cloneService));
         }
         catch (Exception ex)
         {
