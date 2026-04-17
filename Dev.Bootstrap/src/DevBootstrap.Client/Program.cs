@@ -26,22 +26,20 @@ static class Program
             services.AddDataAccess();
             var provider = services.BuildServiceProvider();
 
-            var sync = provider.GetRequiredService<IGitHubRepoSync>();
-            sync.SyncAsync("garyffh").GetAwaiter().GetResult();
-            Log.Information("GitHub repo sync complete");
-
             var apiClient = new ApiClient(
                 provider.GetRequiredService<IRepoRepository>(),
                 provider.GetRequiredService<IToolRepository>(),
                 provider.GetRequiredService<IConfigRepository>());
 
             var cloneService = new RepoCloneService("garyffh", @"C:\Projects");
+            var bootstrap = new BootstrapPipeline(
+                provider.GetRequiredService<IGitHubRepoSync>(),
+                new ClaudeSkillsInstaller(cloneService, @"C:\Projects"),
+                new DotNetSdkInstaller(),
+                new ClaudeLauncherInstaller(cloneService, @"C:\Projects"),
+                "garyffh");
 
-            var skillsInstaller = new ClaudeSkillsInstaller(cloneService, @"C:\Projects");
-            skillsInstaller.InstallOrUpdateAsync(msg => Log.Information("{SkillsMsg}", msg))
-                .GetAwaiter().GetResult();
-
-            Application.Run(new MainForm(apiClient, cloneService));
+            Application.Run(new MainForm(apiClient, cloneService, bootstrap));
         }
         catch (Exception ex)
         {

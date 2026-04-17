@@ -8,19 +8,30 @@ public partial class MainForm : Form
 {
     private readonly IApiClient _apiClient;
     private readonly RepoCloneService _cloneService;
+    private readonly BootstrapPipeline _bootstrap;
     private IReadOnlyList<Repo> _repos = [];
 
-    public MainForm(IApiClient apiClient, RepoCloneService cloneService)
+    public MainForm(IApiClient apiClient, RepoCloneService cloneService, BootstrapPipeline bootstrap)
     {
         _apiClient = apiClient;
         _cloneService = cloneService;
+        _bootstrap = bootstrap;
         InitializeComponent();
     }
 
     protected override async void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
-        await LoadReposAsync();
+        btnCloneRepos.Enabled = false;
+        try
+        {
+            await _bootstrap.RunAsync(LogStatus);
+            await LoadReposAsync();
+        }
+        finally
+        {
+            btnCloneRepos.Enabled = true;
+        }
     }
 
     private async Task LoadReposAsync()

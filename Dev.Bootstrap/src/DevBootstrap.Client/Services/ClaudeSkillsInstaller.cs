@@ -34,11 +34,18 @@ public class ClaudeSkillsInstaller
             return;
         }
 
+        var bashPath = ResolveBashPath();
+        if (bashPath == null)
+        {
+            onStatus("bash.exe not found -- install Git for Windows to enable claude_skills setup.");
+            return;
+        }
+
         onStatus($"Running {InstallScript}...");
 
         var psi = new ProcessStartInfo
         {
-            FileName = "bash",
+            FileName = bashPath,
             Arguments = InstallScript,
             WorkingDirectory = skillsDir,
             RedirectStandardOutput = true,
@@ -72,5 +79,22 @@ public class ClaudeSkillsInstaller
             Log.Error("claude_skills install-update failed (exit {Code}): {Error}", process.ExitCode, stderr);
             onStatus($"claude_skills install-update failed: {stderr.Trim()}");
         }
+    }
+
+    private static string? ResolveBashPath()
+    {
+        string[] candidates =
+        {
+            @"C:\Program Files\Git\bin\bash.exe",
+            @"C:\Program Files\Git\usr\bin\bash.exe",
+            @"C:\Program Files (x86)\Git\bin\bash.exe"
+        };
+
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path)) return path;
+        }
+
+        return null;
     }
 }
