@@ -37,6 +37,10 @@ static class Program
 
             var cloneService = new RepoCloneService("garyffh", @"C:\Projects");
 
+            var skillsInstaller = new ClaudeSkillsInstaller(cloneService, @"C:\Projects");
+            skillsInstaller.InstallOrUpdateAsync(msg => Log.Information("{SkillsMsg}", msg))
+                .GetAwaiter().GetResult();
+
             Application.Run(new MainForm(apiClient, cloneService));
         }
         catch (Exception ex)
